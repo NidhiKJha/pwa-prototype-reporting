@@ -1,7 +1,5 @@
 import React from 'react';
 const baseUrl=process.env.baseUrl;
-const password = process.env.password;
-const username = process.env.username;
 const formId = process.env.formId;
 
 export default class Form extends React.Component {
