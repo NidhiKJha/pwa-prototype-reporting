@@ -1,8 +1,6 @@
 import React from 'react';
-import Link from 'next/link';
-import { Person } from './Users';
-
 const baseUrl=process.env.baseUrl;
+const formId = process.env.formId;
 
 export default class Form extends React.Component {
     constructor() {
@@ -46,17 +44,16 @@ export default class Form extends React.Component {
             fetch(baseUrl + '/oauth/token', {
                 method: 'POST',
                 body: JSON.stringify({
-                    scope: '*',
-                    clientSecret: '35e7f0bca957836d05ca0492211b0ac707671261',
-                    clientId: 'ushahidiui',
-                    grantType: 'password',
-                    password: Person.password,
-                    username: Person.userName
+                    'scope': 'posts country_codes media forms api tags savedsearches sets users stats layers config messages notifications webhooks contacts permissions csv',
+                    'client_secret': '35e7f0bca957836d05ca0492211b0ac707671261',
+                    'client_id': 'ushahidiui',
+                    // no need for a user and password for the moment, 
+                    // post as an anonymous user with a client_credentials grant
+                    'grant_type': 'client_credentials',
                 }),
                 headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    Authorization: 'large-auth-string'
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
                 }
             })
                 .then(response => {
@@ -78,31 +75,22 @@ export default class Form extends React.Component {
     }
 
     getFormFields() {
-        // Fetch the data form fields from API, use it in state
-        let formFields = JSON.parse(localStorage.getItem('Form Fields'));
-        if (!(Array.isArray(formFields) && formFields.length)) {
-            fetch(
-                baseUrl +
-                    '/api/v3/forms/14/attributes?order=asc&orderby=priority'
-            )
-                .then(response => {
-                    if (response.ok) {
-                        return response.json();
-                    } else {
-                        throw new Error('Field fetching response is not ok.');
-                    }
-                })
-                .then(data =>
-                    this.setState({
-                        formFields: data.results
-                    })
-                )
-                .catch(err => console.log(err));
-        } else {
+        fetch(
+            `${baseUrl}/api/v3/forms/${formId}/attributes?order=asc&orderby=priority`
+        )
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            } else {
+                throw new Error('Field fetching response is not ok.');
+            }
+        })
+        .then(data =>
             this.setState({
-                formFields: formFields
-            });
-        }
+                formFields: data.results
+            })
+        )
+        .catch(err => console.log(err));
     }
 
     componentDidMount() {
@@ -110,22 +98,28 @@ export default class Form extends React.Component {
         this.getToken();
     }
 
-    componentDidUpdate(prevProps, prevState) {
-        localStorage.setItem(
-            'Form Fields',
-            JSON.stringify(this.state.formFields)
-        );
-        localStorage.setItem('Bearer Token', JSON.stringify(this.state.token));
-    }
-
     // Handler html For when the submit button is pressed
     onSubmit = e => {
         e.preventDefault();
-
         // Make a post request to Ushahidi sever
+        const values = {};
+        Object.keys(this.state.formData).forEach((key) => {
+            if (key !== 'title' && key !=='description') {
+                values[key] = this.state.formData[key];
+            }
+        })
+        let postData = {
+          "title": this.state.formData.title,
+          "content":this.state.formData.description,
+          "values": values,
+          "form":{
+            "id": formId
+          }
+        }
+  
         fetch(baseUrl + '/api/v3/posts', {
             method: 'POST',
-            body: JSON.stringify(this.state.formData),
+            body: JSON.stringify(postData),
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
@@ -155,7 +149,7 @@ export default class Form extends React.Component {
                     <label htmlFor={field.label}> {field.label} </label>
                     <input
                         type={field.input}
-                        name={field.label}
+                        name={field.type !== 'title' && field.type !== 'description'? field.key : field.type}
                         placeholder={`Enter the ${field.label}`}
                         value={this.state.formData[field.label]}
                         onChange={e => this.change(e)}
